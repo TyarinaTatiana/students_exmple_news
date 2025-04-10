@@ -14,14 +14,59 @@
         <v-card-title>
           Авторизация
         </v-card-title>
-        <v-card-text>
+        <v-card-subtitle>
+          <v-tabs
+              v-model="selectedTab"
+              color="primary"
+              item-text="title"
+
+          >
+            <v-tab
+                v-for="(item, index) in tabItems"
+                :key="index"
+                :text="item.title"
+                :value="item.value"
+                class="uppercase-disabled font-weight-black"
+            />
+          </v-tabs>
+        </v-card-subtitle>
+        <v-card-text style="gap: 8px; display: grid">
+          <div
+              v-if="selectedTab === 2"
+              style="gap: 8px; display: grid"
+          >
+            <v-text-field
+                v-model="lastName"
+                :rules="[(value)=>  !!value || 'Поле обязательно для заполнения' ]"
+                hide-details="auto"
+                label="Фамилия"
+                variant="outlined"
+            />
+            <v-text-field
+                v-model="name"
+                :rules="[(value)=>  !!value || 'Поле обязательно для заполнения' ]"
+                hide-details="auto"
+                label="Имя"
+                variant="outlined"
+            />
+            <v-text-field
+                v-model="secondName"
+                hide-details="auto"
+                label="Отчество"
+                variant="outlined"
+            />
+          </div>
           <v-text-field
               v-model="login"
+              :rules="[(value)=>  !!value || 'Поле обязательно для заполнения' ]"
+              hide-details="auto"
               label="Логин"
               variant="outlined"
           />
           <v-text-field
               v-model="password"
+              :rules="[(value)=>  !!value || 'Поле обязательно для заполнения' ]"
+              hide-details="auto"
               label="Пароль"
               type="password"
               variant="outlined"
@@ -30,7 +75,7 @@
         <v-card-actions>
           <v-btn
               color="primary"
-              text="Войти"
+              :text="selectedTab === 1 ?'Войти' :'Зарегистрироваться'"
               variant="flat"
               @click="onAuthorization"
           />
@@ -67,68 +112,117 @@
 </template>
 
 
-<script lang="ts" setup>
-import {useStore} from "vuex";
-import {computed, inject, onMounted, ref, watch} from "vue";
+<script lang="ts">
+import {mapGetters} from "vuex";
 
-const usersService = inject("usersService"); // Внедряем UserService
-
-const unRegisteredUser = ref(true);
-const authorizationUserDialog = ref(false);
-const login = ref()
-const password = ref()
-const store = useStore()
-
-const currentUser = computed(() => store.getters["usersStore/currentUser"]);
-const menuList = computed(() => {
-  return [
-    {
-      value:1,
-      title: 'Настройки'
+export default {
+  name: "UserPanel",
+  data:()=> ({
+    unRegisteredUser: true,
+    authorizationUserDialog: false,
+    login: '',
+    password: '',
+    selectedTab:1,
+    secondName: '',
+    lastName: '',
+    name: "",
+  }),
+  computed:{
+    ...mapGetters('usersStore', ['currentUser']),
+    menuList(){
+      return [
+        {
+          value:1,
+          title: 'Настройки'
+        },
+        {
+          value:2,
+          title: 'Выход',
+          action: () => {
+            this.$store.dispatch("usersStore/INIT_LOGOUT");
+          }
+        }
+      ]
     },
-    {
-      value:2,
-      title: 'Выход',
-      action: () => {
-        store.dispatch("usersStore/INIT_LOGOUT", );
-      }
+    tabItems() {
+      return [
+        {
+          value: 1,
+          title: 'Войти'
+        },
+        {
+          value: 2,
+          title: 'Регистрация'
+        }
+      ]
     }
-  ]
-})
+  },
+  mounted() {
+    const localStorageUser = localStorage.getItem("currentUser");
+    if (!localStorageUser) {
+      this.unRegisteredUser = true;
 
-onMounted(() => {
-  const localStorageUser = localStorage.getItem("currentUser");
-  if (!localStorageUser) {
-    unRegisteredUser.value = true;
-   
-  } else {
-    unRegisteredUser.value = false;
-    store.dispatch("usersStore/INIT_CURRENT_USER", parseInt(JSON.parse(localStorageUser)));
+    } else {
+      this.unRegisteredUser = false;
+      this.$store.dispatch("usersStore/INIT_CURRENT_USER", parseInt(JSON.parse(localStorageUser)));
+    }
+  },
+  watch:{
+    currentUser:{
+      handler(newValue, oldValue){
+        if (Object.keys(newValue)?.length) this.unRegisteredUser = false;
+        else {
+          console.log(newValue);
+          this.unRegisteredUser = true;
+        }
+      },
+      immediate: true,
+      deep: true
+      
+    }
+  },
+  methods: {
+    async onAuthorization(){
+      //Вызываем метод из стора
+
+      if (this.selectedTab === 1) {
+        if (!this.login || !this.password) {
+          return alert('Не заполнены обязательные поля');
+        }
+        await this.$store.dispatch('usersStore/INIT_AUTORIZATION', {login: this.login, password: this.password})
+            .then(res => {
+              console.log(res)
+            })
+            .finally(() => {
+              this.authorizationUserDialog = false;
+            })
+      }
+      else {
+        if (!this.login || !this.password || !this.name || !this.lastName) {
+          return alert('Не заполнены обязательные поля');
+        }
+        await this.$store.dispatch('usersStore/INIT_REGISTRATION', {
+          login: this.login,
+          password: this.password,
+          name: this.name,
+          lastName: this.lastName,
+          secondName: this.secondName,
+        })
+            .then(res => {
+              console.log(res)
+            })
+            .finally(() => {
+              this.authorizationUserDialog = false;
+            })
+
+      }
+    },
+    onCloseDialog() {
+      this.login = '';
+      this.password = '';
+      this.authorizationUserDialog = false;
+    }
   }
-})
-
-watch(currentUser, (newValue, oldValue) => {
-  console.log('watch(currentUser ', newValue);
-  if (Object.keys(newValue)?.length) unRegisteredUser.value = false;
-  else {
-    console.log(newValue);
-    unRegisteredUser.value = true;
-  }
-}, {immediate: true, deep: true});
-
-
-const onAuthorization = async () => {
-  //Вызываем метод из стора
-  await store.dispatch('usersStore/INIT_AUTORIZATION', {login: login.value, password: password.value})
-      .finally(() => {
-        authorizationUserDialog.value = false;
-      })
-}
-
-const onCloseDialog = () => {
-  login.value = '';
-  password.value = '';
-  authorizationUserDialog.value = false;
 }
 </script>
 

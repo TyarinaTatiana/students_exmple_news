@@ -12,14 +12,14 @@ const userModule = {
     },
     mutations: {
         SET_CURRENT_USER(state, payload) {
-            console.log(payload, state);
             state.currentUser = payload;
+            state.currentUser.fullShortName = state.currentUser.lastName + " " + state.currentUser.name[0] + '.' + state.currentUser.secondName[0] + ".";
+
         }
     },
     actions: {
         async INIT_CURRENT_USER({ commit }, userId) {
             await UserService.getUserById(userId).then((response) => {
-                response.fullShortName = response.lastName + " " + response.name[0]+'.'+response.secondName[0]+".";
                 commit('SET_CURRENT_USER', response)
             })
                 .catch(error => {
@@ -36,6 +36,18 @@ const userModule = {
                 .catch(error => {
                     console.error(error);
                     alert('Ошибка авторизации');
+                })
+        },
+        async INIT_REGISTRATION({commit}, payload) {
+            await UserService.createUser(payload)
+                .then(response => {
+                    console.log(response);
+                    localStorage.setItem('currentUser', response.id);
+                    commit('SET_CURRENT_USER', response);
+                })
+                .catch(error => {
+                    console.error(error);
+
                 })
         },
         async INIT_LOGOUT({commit}) {

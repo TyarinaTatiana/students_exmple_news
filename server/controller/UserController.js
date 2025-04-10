@@ -6,7 +6,7 @@ import {auth_key, base_name} from "../ServerData.js";
 import express from "express";
 
 import Airtable from "airtable-node";
-import {reFormaterResponseData} from "../ServerDataFunction.js";
+import {reformaterBodyData, reFormaterResponseData} from "../ServerDataFunction.js";
 
 /*
 * работа с роутом (уникальным путем коннтроллера)
@@ -110,4 +110,43 @@ router.get("/:userId", (req, res) => {
             }
         })
 })
+
+/*
+    description: Маршрут для создания нового пользователя
+    router: http://localhost:3010/api/users/
+    type: post
+    body: {
+        Login: string (required),
+        Password: string (required),
+        Name: string,
+        и другие поля, объявленные в таблице
+    }
+*/
+router.post("/", (req, res) => {
+    const userData = reformaterBodyData([req.body])[0];
+    // Валидация обязательных полей
+    if (!userData.Login) {
+        return res.status(400).json({message: "Логин пользователя обязателен"});
+    }
+    if (!userData.Password) {
+        return res.status(400).json({message: "Пароль пользователя обязателен"});
+    }
+
+    airtable.create({
+        fields: userData
+    }).then(resp => {
+        // Проверяем наличие ошибок в ответе
+        if (resp.error) {
+            return res.status(500).json({message: "Произошла ошибка сервера", error: resp.error});
+        }
+
+        // Если запись успешно добавлена, возвращаем её
+        const user = reFormaterResponseData([resp])[0]; // Измените на правильный формат ответа
+        return res.status(200).json(user);
+    })
+        .catch(err => {
+            console.error(err);
+            return res.status(500).json({message: "Произошла ошибка при добавлении записи", error: err});
+        });
+});
 export default router;
